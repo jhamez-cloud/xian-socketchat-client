@@ -1,103 +1,136 @@
-import Image from "next/image";
+"use client"
+import {io,Socket} from "socket.io-client"
+import {useContext, useEffect, useRef, useState} from "react";
+import SideBar from "@/app/components/SideBar";
+import {stateContext} from "@/context/StateContext";
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+export default function Home() {g
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    const [message,setMessage]=useState<string>("");
+    //const [receivedMessage,setReceivedMessage]=useState<string>("");
+    //const [room,setRoom]=useState<string>("");
+    const socketRef = useRef<Socket | null>(null);
+
+    const context = useContext(stateContext);
+    if(!context){
+        throw new Error('Invalid context');
+    }
+
+    const {chat,setChat} = context;
+
+    useEffect(() => {
+        const socket = io("http://localhost:8080", { transports: ["websocket"] });
+        socketRef.current = socket;
+
+        socket.on("connect", () => {
+            console.log("Connected:", socket.id);
+        });
+
+        socket.on("receive_message", (data) => {
+
+            setChat((prev) => ({
+                ...prev,
+                messages: [...(prev.messages || []), data],
+            }));
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, [setChat]);
+
+
+    useEffect(() => {
+        if (chat?.room && socketRef.current) {
+            socketRef.current.emit("join_room", chat.room);
+        }
+    }, [chat?.room]);
+
+
+    const handleSend = (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmed = message.trim();
+        if (!trimmed || !chat?.room) return;
+
+        const data = {
+            id: socketRef.current?.id,
+            room: chat.room,
+            message: trimmed,
+        };
+
+        setChat((prev) => ({
+            ...prev,
+            messages: [...(prev.messages || []), data],
+        }));
+
+        socketRef.current?.emit("send_message", data);
+        setMessage("");
+    };
+
+    return (
+        <div className="w-full h-screen flex">
+            <SideBar />
+
+            <div className="w-3/4 h-full bg-[url('/images/backgroundPrint.jpg')]">
+                {chat.selected && (
+                    <>
+                        {/* --- Chat Header --- */}
+                        <div className="bg-white h-1/12 w-full flex justify-between border-l-2 border-l-gray-300 p-2 px-4">
+                            <figure className="flex space-x-2">
+                                <img
+                                    src="/images/img_2.jpeg"
+                                    alt=""
+                                    className="w-[50px] h-[50px] rounded-full"
+                                />
+                                <figcaption className="w-5/6 h-[50px] pb-2">
+                                    <h1 className="text-lg font-bold flex items-center space-x-2">
+                                        {chat.chatPartner}
+                                    </h1>
+                                    <p>Last Seen 5 min ago</p>
+                                </figcaption>
+                            </figure>
+
+                            <div className="flex h-full w-[100px] justify-center items-center space-x-2">
+                                <img src="/icons/Search.png" alt="" className="w-[25px] h-[30px]" />
+                                <img src="/icons/Call%20Icon.png" alt="" className="w-[35px] h-[40px]" />
+                                <img src="/icons/more%20icon.png" alt="" className="w-[30px] h-[35px] pt-1" />
+                            </div>
+                        </div>
+
+                        {/* --- Chat Body --- */}
+                        <div className="w-full h-11/12 px-20 pt-4 flex flex-col justify-between pb-4">
+                            <div className="w-full h-5/6 overflow-y-scroll  flex flex-col space-y-2 p-3">
+                                {chat.messages?.map((msg, index) => {
+                                    const isMine = msg.id === socketRef.current?.id;
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`relative px-3 py-2 min-w-[60px] rounded-2xl text-lg shadow-sm ${
+                                                isMine
+                                                    ? "self-end bg-green-500 text-white bubble-right"
+                                                    : "self-start bg-gray-200 text-black bubble-left"
+                                            }`}
+                                        >
+                                            {msg.message}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* --- Message Input --- */}
+                            <form onSubmit={handleSend}>
+                                <input
+                                    type="text"
+                                    placeholder="Type Message To Send"
+                                    className="w-full h-[50px] rounded-md p-2 text-lg bg-white focus:outline-none"
+                                    value={message}
+                                    onChange={(e) => setMessage(e.target.value)}
+                                />
+                            </form>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+    );
 }
