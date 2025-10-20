@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext } from "react";
 import { stateContext } from "@/context/StateContext";
 
 interface Props {
@@ -9,51 +9,40 @@ interface Props {
 }
 
 const Card = (props: Props) => {
-    const [selected, setSelected] = useState(false);
     const context = useContext(stateContext);
-
     if (!context) throw new Error("Context Provider not found");
-    const { chat, setChat } = context;
 
-    // Generate a deterministic room name based on both usernames
+    const { setChat, activeChat, setActiveChat, username } = context;
+
     const createRoomName = (userA: string, userB: string) => {
-        if (!userA || !userB) return "";
         return [userA.toLowerCase(), userB.toLowerCase()].sort().join("_");
-    }
+    };
 
-
-    // Prompt for username once per session
-    useEffect(() => {
-        if (!chat?.username) {
-            const name =
-                prompt("Enter username:") || `User_${Math.floor(Math.random() * 1000)}`;
-            setChat((prev) => ({ ...prev, username: name }));
-        }
-    }, [chat?.username, setChat]);
-
-    const createRoom = () => {
-        const newSelected = !selected;
-        setSelected(newSelected);
-
-        if (!chat?.username) return;
-
-        const roomName = createRoomName(chat?.username, props.title);
+    const handleSelect = () => {
+        if (!username) return;
+        const roomName = createRoomName(username, props.title);
 
         setChat((prev) => ({
             ...prev,
-            id: prev.id || "",
-            room: roomName,
-            selected: newSelected,
-            messages: prev.messages || [],
-            chatPartner:props.title
+            [roomName]: {
+                ...prev[roomName],
+                id: prev[roomName]?.id || "",
+                room: roomName,
+                selected: true,
+                messages: prev[roomName]?.messages || [],
+                username,
+                chatPartner: props.title,
+            },
         }));
+
+        setActiveChat(roomName);
     };
 
-    const isSelected = chat.room === createRoomName(chat.username, props.title);
+    const isSelected = activeChat === createRoomName(username, props.title);
 
     return (
         <figure
-            onClick={createRoom}
+            onClick={handleSelect}
             className={`w-full h-[60px] flex items-center space-x-4 px-2 mb-2 cursor-pointer transition ${
                 isSelected ? "bg-gray-200" : "hover:bg-gray-100"
             }`}
