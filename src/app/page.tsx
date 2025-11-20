@@ -148,7 +148,7 @@ export default function Home() {
                         </div>
                     </>
                 ) : (
-                    <div className="flex justify-center items-center h-full text-gray-500 text-xl">
+                    <div className="flex justify-center items-center h-full font-bold text-white text-3xl text-shadow-lg">
                         Select a chat to start messaging
                     </div>
                 )}
